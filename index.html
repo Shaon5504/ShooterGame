@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML5 Shooter Game</title>
+    <style>
+        body { text-align: center; background: #000; color: white; }
+        canvas { background: #111; display: block; margin: auto; }
+    </style>
+</head>
+<body>
+    <h1>HTML5 Shooter Game</h1>
+    <label for="playerName">Enter your name:</label>
+    <input type="text" id="playerName" placeholder="Your Name">
+    <button onclick="setPlayerName()">Save Name</button>
+    <p id="displayName"></p>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <h2>Leaderboard</h2>
+    <ul id="leaderboard"></ul>
+    <button id="withdrawButton">Withdraw Points</button>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        let score = 0;
+        let enemies = [];
+        let bullets = [];
+        let playerName = "Anonymous";
+        let userId = Math.floor(Math.random() * 1000000); // Temporary User ID
+
+        function setPlayerName() {
+            const input = document.getElementById("playerName").value;
+            if (input) {
+                playerName = input;
+                document.getElementById("displayName").innerText = `Player: ${playerName}`;
+            }
+        }
+
+        function updateScore() {
+            fetch("http://yourserver.com/update_score", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: userId, score: score })
+            })
+            .then(response => response.json())
+            .then(data => console.log("Score updated:", data))
+            .catch(error => console.error("Error:", error));
+        }
+
+        class Player {
+            constructor() {
+                this.x = canvas.width / 2;
+                this.y = canvas.height - 50;
+                this.width = 50;
+                this.height = 50;
+                this.speed = 5;
+            }
+            draw() {
+                ctx.fillStyle = "white";
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+        }
+        
+        class Enemy {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 40;
+                this.height = 40;
+                this.speed = 2;
+            }
+            move() { this.y += this.speed; }
+            draw() {
+                ctx.fillStyle = "red";
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+        }
+        
+        class Bullet {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 5;
+                this.height = 10;
+                this.speed = 5;
+            }
+            move() { this.y -= this.speed; }
+            draw() {
+                ctx.fillStyle = "yellow";
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+        }
+        
+        const player = new Player();
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "ArrowLeft" && player.x > 0) player.x -= player.speed;
+            if (e.key === "ArrowRight" && player.x + player.width < canvas.width) player.x += player.speed;
+            if (e.key === " ") bullets.push(new Bullet(player.x + player.width / 2, player.y));
+        });
+        
+        function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            player.draw();
+            bullets.forEach((bullet, index) => {
+                bullet.move();
+                bullet.draw();
+                if (bullet.y < 0) bullets.splice(index, 1);
+            });
+            enemies.forEach((enemy, index) => {
+                enemy.move();
+                enemy.draw();
+                if (enemy.y > canvas.height) enemies.splice(index, 1);
+                bullets.forEach((bullet, bIndex) => {
+                    if (
+                        bullet.x < enemy.x + enemy.width &&
+                        bullet.x + bullet.width > enemy.x &&
+                        bullet.y < enemy.y + enemy.height &&
+                        bullet.y + bullet.height > enemy.y
+                    ) {
+                        enemies.splice(index, 1);
+                        bullets.splice(bIndex, 1);
+                        score += 10;
+                        updateScore();
+                        updateLeaderboard();
+                    }
+                });
+            });
+        }
+        
+        function spawnEnemy() {
+            let x = Math.random() * (canvas.width - 40);
+            enemies.push(new Enemy(x, 0));
+        }
+        
+        function updateLeaderboard() {
+            const leaderboard = document.getElementById("leaderboard");
+            leaderboard.innerHTML = `<li>${playerName}: ${score} points</li>`;
+        }
+        
+        setInterval(spawnEnemy, 2000);
+        function gameLoop() {
+            update();
+            requestAnimationFrame(gameLoop);
+        }
+        gameLoop();
+    </script>
+</body>
+</html>
